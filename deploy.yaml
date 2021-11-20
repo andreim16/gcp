@@ -2,6 +2,7 @@ resources:
 - type: compute.v1.instance
   name: www1
   properties:
+    machineType: zones/us-central1-a/machineTypes/n1-standard-1
     # The properties of the resource depend on the type of resource. For a list
     # of properties, see the API reference for the resource.
     zone: us-central1-a
@@ -9,7 +10,10 @@ resources:
       items:
       - network-lb-tag
     networkInterfaces:
-    - network: default
+    - network: global/networks/default
+      accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
 #    networkInterfaces:
 #    - network: https://www.googleapis.com/compute/v1/projects/{{ env["project"] }}/global/networks/default
 #      accessConfigs:
@@ -17,65 +21,61 @@ resources:
 #        type: ONE_TO_ONE_NAT
     disks:
     - deviceName: boot
+      boot: true
       initializeParams:
         # See a full list of image families at https://cloud.google.com/compute/docs/images#os-compute-support
         # The format of the sourceImage URL is: https://www.googleapis.com/compute/v1/projects/[IMAGE_PROJECT]/global/images/family/[FAMILY_NAME]
         sourceImage: https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/family/debian-9
-  metadata:
-    items:
-    - key: startup-script
-      value: |
-        #! /bin/bash
-        sudo apt-get update
-        sudo apt-get install apache2 -y
-        sudo service apache2 restart
-        echo '<!doctype html><html><body><h1>www1</h1></body></html>' | tee /var/www/html/index.html
+    metadata:
+      items:
+      - key: startup-script
+        value: "#! /bin/bash\n    sudo apt-get update\n    sudo apt-get install apache2 -y\n    sudo service apache2 restart\n    echo '<!doctype html><html><body><h1>www1</h1></body></html>' | tee /var/www/html/index.html"
 
 - type: compute.v1.instance
   name: www2
   properties:
+    machineType: zones/us-central1-a/machineTypes/n1-standard-1
     zone: us-central1-a
     tags:
       items:
       - network-lb-tag
     networkInterfaces:
-    - network: default
+    - network: global/networks/default
+      accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
     disks:
     - deviceName: boot
+      boot: true
       initializeParams:
         sourceImage: https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/family/debian-9
-  metadata:
-    items:
-    - key: startup-script
-      value: |
-        #! /bin/bash
-        sudo apt-get update
-        sudo apt-get install apache2 -y
-        sudo service apache2 restart
-        echo '<!doctype html><html><body><h1>www2</h1></body></html>' | tee /var/www/html/index.html
+    metadata:
+      items:
+      - key: startup-script
+        value: "#! /bin/bash\n    sudo apt-get update\n    sudo apt-get install apache2 -y\n    sudo service apache2 restart\n    echo '<!doctype html><html><body><h1>www2</h1></body></html>' | tee /var/www/html/index.html"
 
 - type: compute.v1.instance
   name: www3
   properties:
+    machineType: zones/us-central1-a/machineTypes/n1-standard-1
     zone: us-central1-a
     tags:
       items:
       - network-lb-tag
     networkInterfaces:
-    - network: default
+    - network: global/networks/default
+      accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
     disks:
     - deviceName: boot
+      boot: true
       initializeParams:
         sourceImage: https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/family/debian-9
-  metadata:
-    items:
-    - key: startup-script
-      value: |
-        #! /bin/bash
-        sudo apt-get update
-        sudo apt-get install apache2 -y
-        sudo service apache2 restart
-        echo '<!doctype html><html><body><h1>www3</h1></body></html>' | tee /var/www/html/index.html
+    metadata:
+      items:
+      - key: startup-script
+        value: "#! /bin/bash\n    sudo apt-get update\n    sudo apt-get install apache2 -y\n    sudo service apache2 restart\n    echo '<!doctype html><html><body><h1>www3</h1></body></html>' | tee /var/www/html/index.html"
 
 - type: compute.v1.firewall
   name: www-firewall-network-lb
@@ -99,12 +99,12 @@ resources:
   name: www-pool
   properties:
     region: us-central1
-    healthChecks: basic-check
-    - basic-check
+    healthChecks:
+    - $(ref.basic-check.selfLink)
     instances:
-    - www1
-    - www2
-    - www3
+    - $(ref.www1.selfLink)
+    - $(ref.www2.selfLink)
+    - $(ref.www3.selfLink)
 
 - type: compute.v1.forwardingRule
   name: www-rule
@@ -112,7 +112,7 @@ resources:
     region: us-central1
     ports:
     - '80'
-    IPAddress: network-lb-ip-1
+    IPAddress: $(ref.network-lb-ip-1.selfLink)
     target: www-pool
 
 - type: compute.v1.instanceTemplate
@@ -120,7 +120,7 @@ resources:
   properties:
     region: us-central1
     networkInterfaces:
-    - network: default
+    - network: global/networks/default
       subnetwork: default
     tags:
       items:
@@ -166,7 +166,7 @@ resources:
       - '80'
 
 - type: compute.v1.globalAddress
-  name: lb-ipv4-
+  name: lb-ipv4-1
   properties:
     ipVersion: IPV4
 
@@ -180,9 +180,9 @@ resources:
     portName: http
     healthChecks:
     - $(ref.http-basic-check.selfLink)
-    backends:
-    - web-backend-service
-      group: $(ref.lb-backend-group.selfLink)
+    # backends:
+    # - $(ref.web-backend-service.selfLink)
+    group: $(ref.lb-backend-group.selfLink)
 
 - type: compute.v1.urlMap
   name: web-map-http
