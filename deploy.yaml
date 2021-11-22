@@ -102,48 +102,42 @@ resources:
     healthChecks:
     - $(ref.basic-check.selfLink)
     instances:
-    - $(ref.www1.selfLink)
-    - $(ref.www2.selfLink)
-    - $(ref.www3.selfLink)
+    - projects/qwiklabs-gcp-00-c47d1229b791/zones/us-central1-a/instances/www1
+    - projects/qwiklabs-gcp-00-c47d1229b791/zones/us-central1-a/instances/www2
+    - projects/qwiklabs-gcp-00-c47d1229b791/zones/us-central1-a/instances/www3
 
 - type: compute.v1.forwardingRule
   name: www-rule
   properties:
     region: us-central1
+    IPProtocol: TCP
     ports:
     - '80'
     IPAddress: $(ref.network-lb-ip-1.selfLink)
-    target: www-pool
+    target: $(ref.www-pool.selfLink)
 
 - type: compute.v1.instanceTemplate
   name: lb-backend-template
   properties:
-    region: us-central1
-    networkInterfaces:
-    - network: global/networks/default
-      subnetwork: default
-    tags:
+    project: qwiklabs-gcp-00-c47d1229b791
+    properties:
+      region: us-central1
+      machineType: n1-standard-1
+      networkInterfaces:
+      - network: global/networks/default
+        subnetwork: regions/us-central1/subnetworks/default
+      tags:
+        items:
+        - allow-health-check
+      disks:
+      - deviceName: boot
+        boot: true
+        initializeParams:
+          sourceImage: https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/family/debian-9
+    metadata:
       items:
-      - allow-health-check
-    disks:
-    - deviceName: boot
-      initializeParams:
-        sourceImage: https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/family/debian-9
-  metadata:
-    items:
-    - key: startup-script
-      value: |
-        #! /bin/bash
-        apt-get update
-        apt-get install apache2 -y
-        a2ensite default-ssl
-        a2enmod ssl
-        vm_hostname="$(curl -H "Metadata-Flavor:Google" \
-        http://169.254.169.254/computeMetadata/v1/instance/name)"
-        echo "Page served from: $vm_hostname" | \
-        tee /var/www/html/index.html
-        systemctl restart apache2
-
+      - key: startup-script
+        value: "#! /bin/bash\n  apt-get update\n    apt-get install apache2 -y\n  a2ensite default-ssl\n a2enmod ssl\n  vm_hostname=\"$(curl -H \"Metadata-Flavor:Google\" http://169.254.169.254/computeMetadata/v1/instance/name)\"\n echo \"Page served from: $vm_hostname\" | tee /var/www/html/index.html\n systemctl restart apache2"
 
 - type: compute.v1.instanceGroupManager
   name: lb-backend-group
@@ -180,8 +174,6 @@ resources:
     portName: http
     healthChecks:
     - $(ref.http-basic-check.selfLink)
-    # backends:
-    # - $(ref.web-backend-service.selfLink)
     group: $(ref.lb-backend-group.selfLink)
 
 - type: compute.v1.urlMap
@@ -199,5 +191,5 @@ resources:
   properties:
     ports:
     - '80'
-    IPAddress: lb-ipv4-1
+    IPAddress: $(ref.lb-ipv4-1.selfLink)
     target: $(ref.http-lb-proxy.selfLink)
